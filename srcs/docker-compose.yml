@@ -1,0 +1,123 @@
+services:
+  mariadb:
+    container_name: mariadb
+    build:
+      context: requirements/mariadb
+      dockerfile: Dockerfile
+    env_file: [.env]
+    networks: [inception]
+    volumes:
+      - mariadb:/var/lib/mysql
+    restart: unless-stopped
+    expose: ["3306"]
+
+  redis:
+    profiles:
+      - bonus
+    container_name: redis
+    build:
+      context: requirements/bonus/redis
+    image: redis:inception
+    networks: [inception]
+    restart: unless-stopped
+    expose: ["6379"]
+
+  wordpress:
+    container_name: wordpress
+    build:
+      context: requirements/wordpress
+      dockerfile: Dockerfile
+    env_file: [.env]
+    networks: [inception]
+    volumes:
+      - wordpress:/var/www/wordpress
+    depends_on:
+      - mariadb
+    restart: unless-stopped
+    expose: ["9000"]
+
+  nginx:
+    container_name: nginx
+    build:
+      context: requirements/nginx
+      dockerfile: Dockerfile
+    env_file: [.env]
+    networks: [inception]
+    volumes:
+      - wordpress:/var/www/wordpress
+    depends_on:
+      - wordpress
+    ports:
+      - "443:443"
+    restart: unless-stopped
+
+  ftp:
+    profiles:
+      - bonus
+    container_name: ftp
+    build:
+      context: requirements/bonus/ftp
+    image: ftp:inception
+    env_file: [.env]
+    volumes:
+      - wordpress:/home/msingh/ftp/wordpress
+    networks: [inception]
+    ports:
+      - "21:21"
+      - "40000-40010:40000-40010"
+    restart: unless-stopped
+
+  website:
+    profiles:
+      - bonus
+    container_name: website
+    build:
+      context: requirements/bonus/website
+    image: website:inception
+    networks: [inception]
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  adminer:
+    profiles:
+      - bonus
+    container_name: adminer
+    build:
+      context: requirements/bonus/adminer
+    image: adminer:inception
+    networks: [inception]
+    depends_on:
+      - mariadb
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+  dozzle:
+    image: amir20/dozzle:v8
+    container_name: dozzle
+    ports:
+      - "8082:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    profiles:
+      - bonus
+
+volumes:
+  wordpress:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/msingh/data/wordpress
+  mariadb:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/msingh/data/mariadb
+
+networks:
+  inception:
+    driver: bridge
